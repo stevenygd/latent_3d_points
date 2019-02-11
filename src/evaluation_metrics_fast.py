@@ -9,16 +9,17 @@ Created on October 11, 2017
   journal={arXiv preprint arXiv:1707.02392},
   year={2017}
 }
+
+Codes taken from https://github.com/optas/latent_3d_points/blob/master/src/evaluation_metrics.py
 '''
 
 import tensorflow as tf
 import numpy as np
 import warnings
-
-from scipy.stats import entropy
-from . general_utils import iterate_in_chunks, unit_cube_grid_point_cloud
 import tqdm
 
+from scipy.stats import entropy
+from. general_utils import iterate_in_chunks, unit_cube_grid_point_cloud
 try:
     from sklearn.neighbors import NearestNeighbors
 except:
@@ -31,7 +32,9 @@ except:
     print('External Losses (Chamfer-EMD) cannot be loaded. Please install them first.')
 
 
-def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=True, sess=None, verbose=False, use_sqrt=False, use_EMD=False):
+
+def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=True, sess=None,
+                                      verbose=False, use_sqrt=False):
     ''' Produces the graph operations necessary to compute the MMD and consequently also the Coverage due to their 'symmetric' nature.
     Assuming a "reference" and a "sample" set of point-clouds that will be matched, this function creates the operation that matches
     a _single_ "reference" point-cloud to all the "sample" point-clouds given in a batch. Thus, is the building block of the function
@@ -71,24 +74,33 @@ def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=Tr
     ref_repeat = tf.tile(ref_pl, [batch_size, 1, 1])
     ref_repeat = tf.reshape(ref_repeat, [batch_size, n_pc_points, 3])
 
-    if use_EMD:
-        match = approx_match(ref_repeat, sample_pl)
-        all_dist_in_batch = match_cost(ref_repeat, sample_pl, match)
-        if normalize:
-            all_dist_in_batch /= n_pc_points
-    else:
-        ref_to_s, _, s_to_ref, _ = nn_distance(ref_repeat, sample_pl)
-        if use_sqrt:
-            ref_to_s = tf.sqrt(ref_to_s)
-            s_to_ref = tf.sqrt(s_to_ref)
-        all_dist_in_batch = reducer(ref_to_s, 1) + reducer(s_to_ref, 1)
+    # EMD:
+    match = approx_match(ref_repeat, sample_pl)
+    all_dist_in_batch_EMD = match_cost(ref_repeat, sample_pl, match)
+    if normalize:
+        all_dist_in_batch_EMD /= n_pc_points
 
-    best_in_batch = tf.reduce_min(all_dist_in_batch)   # Best distance, of those that were matched to single ref pc.
-    location_of_best = tf.argmin(all_dist_in_batch, axis=0)
-    return ref_pl, sample_pl, best_in_batch, location_of_best, sess
+    # Best distance, of those that were matched to single ref pc.
+    best_in_batch_EMD = tf.reduce_min(all_dist_in_batch_EMD)
+    location_of_best_EMD = tf.argmin(all_dist_in_batch_EMD, axis=0)
+
+    # CD
+    ref_to_s, _, s_to_ref, _ = nn_distance(ref_repeat, sample_pl)
+    if use_sqrt:
+        ref_to_s = tf.sqrt(ref_to_s)
+        s_to_ref = tf.sqrt(s_to_ref)
+    all_dist_in_batch_CD = reducer(ref_to_s, 1) + reducer(s_to_ref, 1)
+
+    # Best distance, of those that were matched to single ref pc.
+    best_in_batch_CD = tf.reduce_min(all_dist_in_batch_CD)
+    location_of_best_CD = tf.argmin(all_dist_in_batch_CD, axis=0)
+
+    return ref_pl, sample_pl, best_in_batch_EMD, location_of_best_EMD, \
+            best_in_batch_CD, location_of_best_CD, sess
 
 
-def minimum_mathing_distance(sample_pcs, ref_pcs, batch_size, normalize=True, sess=None, verbose=False, use_sqrt=False, use_EMD=False):
+def MMD_COV_EMD_CD(sample_pcs, ref_pcs, batch_size,
+        normalize=True, sess=None, verbose=False, use_sqrt=False, ret_dist=False):
     '''Computes the MMD between two sets of point-clouds.
 
     Args:
@@ -103,11 +115,11 @@ def minimum_mathing_distance(sample_pcs, ref_pcs, batch_size, normalize=True, se
         use_sqrt: (boolean): When the matching is based on Chamfer (default behavior), if True, the
             Chamfer is computed based on the (not-squared) euclidean distances of the matched point-wise
              euclidean distances.
+        ret_dist (boolean): If true, it will also return the distances between each sample_pcs and
+            it's matched ground-truth.
         sess (tf.Session, default None): if None, it will make a new Session for this.
-        use_EMD (boolean: If true, the matchings are based on the EMD.
-
     Returns:
-        A tuple containing the MMD and all the matched distances of which the MMD is their mean.
+        MMD-EMD, COV-EMD, MMD-CD, COV-CD
     '''
 
     n_ref, n_pc_points, pc_dim = ref_pcs.shape
@@ -116,83 +128,57 @@ def minimum_mathing_distance(sample_pcs, ref_pcs, batch_size, normalize=True, se
     if n_pc_points != n_pc_points_s or pc_dim != pc_dim_s:
         raise ValueError('Incompatible size of point-clouds.')
 
-    ref_pl, sample_pl, best_in_batch, _, sess = minimum_mathing_distance_tf_graph(n_pc_points, normalize=normalize,
-                                                                                  sess=sess, use_sqrt=use_sqrt,
-                                                                                  use_EMD=use_EMD)
-    matched_dists = []
-    for i in xrange(n_ref):
-        best_in_all_batches = []
-        if verbose and i % 50 == 0:
-            print i
-        for sample_chunk in iterate_in_chunks(sample_pcs, batch_size):
-            feed_dict = {ref_pl: np.expand_dims(ref_pcs[i], 0), sample_pl: sample_chunk}
-            b = sess.run(best_in_batch, feed_dict=feed_dict)
-            best_in_all_batches.append(b)
-        matched_dists.append(np.min(best_in_all_batches))
-    mmd = np.mean(matched_dists)
-    return mmd, matched_dists
+    ref_pl, sample_pl, best_in_batch_EMD, loc_best_EMD, best_in_batch_CD, loc_best_CD, sess = \
+            minimum_mathing_distance_tf_graph(n_pc_points, normalize=normalize,
+                sess=sess, use_sqrt=use_sqrt)
 
-
-def coverage(sample_pcs, ref_pcs, batch_size, normalize=True, sess=None, verbose=False, use_sqrt=False, use_EMD=False, ret_dist=False):
-    '''Computes the Coverage between two sets of point-clouds.
-
-    Args:
-        sample_pcs (numpy array SxKx3): the S point-clouds, each of K points that will be matched
-            and compared to a set of "reference" point-clouds.
-        ref_pcs    (numpy array RxKx3): the R point-clouds, each of K points that constitute the
-            set of "reference" point-clouds.
-        batch_size (int): specifies how large will the batches be that the compute will use to
-            make the comparisons of the sample-vs-ref point-clouds.
-        normalize (boolean): if True, the distances are normalized by diving them with
-            the number of the points of the point-clouds (n_pc_points).
-        use_sqrt  (boolean): When the matching is based on Chamfer (default behavior), if True,
-            the Chamfer is computed based on the (not-squared) euclidean distances of the matched
-            point-wise euclidean distances.
-        sess (tf.Session):  If None, it will make a new Session for this.
-        use_EMD (boolean): If true, the matchings are based on the EMD.
-        ret_dist (boolean): If true, it will also return the distances between each sample_pcs and
-            it's matched ground-truth.
-        Returns: the coverage score (int),
-                 the indices of the ref_pcs that are matched with each sample_pc
-                 and optionally the matched distances of the samples_pcs.
-    '''
-    n_ref, n_pc_points, pc_dim = ref_pcs.shape
-    n_sam, n_pc_points_s, pc_dim_s = sample_pcs.shape
-
-    if n_pc_points != n_pc_points_s or pc_dim != pc_dim_s:
-        raise ValueError('Incompatible Point-Clouds.')
-
-    ref_pl, sample_pl, best_in_batch, loc_of_best, sess = minimum_mathing_distance_tf_graph(n_pc_points, normalize=normalize,
-                                                                                            sess=sess, use_sqrt=use_sqrt,
-                                                                                            use_EMD=use_EMD)
-    matched_gt = []
-    matched_dist = []
-    for i in xrange(n_sam):
-        best_in_all_batches = []
-        loc_in_all_batches = []
-
-        if verbose and i % 50 == 0:
-            print i
-
-        for ref_chunk in iterate_in_chunks(ref_pcs, batch_size):
-            feed_dict = {ref_pl: np.expand_dims(sample_pcs[i], 0), sample_pl: ref_chunk}
-            b, loc = sess.run([best_in_batch, loc_of_best], feed_dict=feed_dict)
-            best_in_all_batches.append(b)
-            loc_in_all_batches.append(loc)
-
+    def _helper_(best_in_all_batches, loc_in_all_batches):
         best_in_all_batches = np.array(best_in_all_batches)
         b_hit = np.argmin(best_in_all_batches)    # In which batch the minimum occurred.
-        matched_dist.append(np.min(best_in_all_batches))
+        matched_dist = np.min(best_in_all_batches)
         hit = np.array(loc_in_all_batches)[b_hit]
-        matched_gt.append(batch_size * b_hit + hit)
+        matched_gt = batch_size * b_hit + hit
+        return matched_dist, matched_gt
 
-    cov = len(np.unique(matched_gt)) / float(n_ref)
+    matched_gt_EMD = []
+    matched_gt_CD  = []
+    matched_dists_EMD = []
+    matched_dists_CD  = []
+    iterator = tqdm.trange(n_ref, desc=("MMD-COV Loop")) if verbose else range(n_ref)
+    for i in iterator:
+        best_in_all_batches_EMD = []
+        loc_in_all_batches_EMD = []
+        best_in_all_batches_CD  = []
+        loc_in_all_batches_CD = []
+        for sample_chunk in iterate_in_chunks(sample_pcs, batch_size):
+            feed_dict = {ref_pl: np.expand_dims(ref_pcs[i], 0), sample_pl: sample_chunk}
+            b_EMD, b_CD, l_EMD, l_CD = sess.run([
+                best_in_batch_EMD, best_in_batch_CD, loc_best_EMD, loc_best_CD],
+                feed_dict=feed_dict
+            )
+            best_in_all_batches_EMD.append(b_EMD)
+            best_in_all_batches_CD.append(b_CD)
+            loc_in_all_batches_EMD.append(l_EMD)
+            loc_in_all_batches_CD.append(l_CD)
+
+        dist_emd, gt_emd = _helper_(best_in_all_batches_EMD, loc_in_all_batches_EMD)
+        dist_cd, gt_cd   = _helper_(best_in_all_batches_CD, loc_in_all_batches_CD)
+
+        matched_gt_EMD.append(gt_emd)
+        matched_gt_CD.append(gt_cd)
+        matched_dists_EMD.append(dist_emd)
+        matched_dists_CD.append(dist_cd)
+
+    mmd_emd = np.mean(matched_dists_EMD)
+    mmd_cd  = np.mean(matched_dists_CD)
+
+    cov_emd = len(np.unique(matched_gt_EMD)) / float(n_ref)
+    cov_cd  = len(np.unique(matched_gt_CD)) / float(n_ref)
 
     if ret_dist:
-        return cov, matched_gt, matched_dist
-    else:
-        return cov, matched_gt
+        raise Exception("Not implemented yet.")
 
+    return mmd_emd, mmd_cd, cov_emd, cov_cd
 
 def jsd_between_point_cloud_sets(sample_pcs, ref_pcs, resolution=28):
     '''Computes the JSD between two sets of point-clouds, as introduced in the paper ```Learning Representations And Generative Models For 3D Point Clouds```.
@@ -206,7 +192,7 @@ def jsd_between_point_cloud_sets(sample_pcs, ref_pcs, resolution=28):
     ref_grid_var = entropy_of_occupancy_grid(ref_pcs, resolution, in_unit_sphere)[1]
     return jensen_shannon_divergence(sample_grid_var, ref_grid_var)
 
-def entropy_of_occupancy_grid(pclouds, grid_resolution, in_sphere=False):
+def entropy_of_occupancy_grid(pclouds, grid_resolution, in_sphere=False, verbose=0):
     '''Given a collection of point-clouds, estimate the entropy of the random variables
     corresponding to occupancy-grid activation patterns.
     Inputs:
@@ -215,10 +201,10 @@ def entropy_of_occupancy_grid(pclouds, grid_resolution, in_sphere=False):
     '''
     epsilon = 10e-4
     bound = 0.5 + epsilon
-    if abs(np.max(pclouds)) > bound or abs(np.min(pclouds)) > bound:
+    if (abs(np.max(pclouds)) > bound or abs(np.min(pclouds)) > bound) and verbose > 0:
         warnings.warn('Point-clouds are not in unit cube.')
 
-    if in_sphere and np.max(np.sqrt(np.sum(pclouds ** 2, axis=2))) > bound:
+    if (in_sphere and np.max(np.sqrt(np.sum(pclouds ** 2, axis=2))) > bound) and verbose > 0:
         warnings.warn('Point-clouds are not in unit sphere.')
 
     grid_coordinates, _ = unit_cube_grid_point_cloud(grid_resolution, in_sphere)
@@ -285,3 +271,46 @@ def _jsdiv(P, Q):
     M = 0.5 * (P_ + Q_)
 
     return 0.5 * (_kldiv(P_, M) + _kldiv(Q_, M))
+
+
+########################################################################
+# Evaluation Metrics from PC-GAN (Distance-to-Face based)
+########################################################################
+
+# import pymesh
+# def MMD_COV_D2F(pc_lst, mesh_lst, one_to_one=True):
+#     num_broken_mesh = len([x for x in mesh_lst if x is None])
+#     print("Broken mesh : %d"%num_broken_mesh)
+#
+#     N, M = len(pc_lst), len(mesh_lst)
+#
+#     mmd_out = []
+#     cov_out = []
+#
+#     for i in tqdm.trange(N, desc="D2F"):
+#         pc = pc_lst[i].reshape(-1, 3)
+#         idx_lst = [i] if one_to_one else range(M)
+#
+#         best_dist = None
+#         best_cov  = None
+#         for j in idx_lst:
+#             mesh = mesh_lst[j]
+#             if mesh is None:
+#                 continue
+#             squared_distances, face_indices, _ = pymesh.distance_to_mesh(mesh, pc)
+#
+#             dist = np.array(squared_distances).mean()
+#             best_dist = dist if best_dist is None else min(best_dist, dist)
+#
+#             cov  = float(len(np.unique(face_indices))) / float(mesh.num_faces)
+#             best_cov = cov if best_cov is None else max(best_cov, cov)
+#
+#         mmd_out.append(best_dist)
+#         cov_out.append(best_cov)
+#
+#     mmd_out = np.array(mmd_out).mean()
+#     cov_out = np.array(cov_out).mean()
+#     return mmd_out, cov_out
+
+
+

@@ -101,7 +101,7 @@ def load_ply(file_name, with_faces=False, with_color=False):
 
 
 def pc_loader(f_name):
-    ''' loads a point-cloud saved under ShapeNet's "standar" folder scheme: 
+    ''' loads a point-cloud saved under ShapeNet's "standar" folder scheme:
     i.e. /syn_id/model_name.ply
     '''
     tokens = f_name.split('/')
@@ -110,10 +110,57 @@ def pc_loader(f_name):
     return load_ply(f_name), model_id, synet_id
 
 
-def load_all_point_clouds_under_folder(top_dir, n_threads=20, file_ending='.ply', verbose=False):
+def pc_npy_loader(f_name):
+    ''' loads a point-cloud saved under ShapeNet's "standar" folder scheme:
+    i.e. /syn_id/model_name.npy
+    '''
+    tokens = f_name.split('/')
+    model_id = tokens[-1].split('.')[0]
+    synet_id = tokens[-2]
+    out = np.load(f_name)
+    return out, model_id, synet_id
+
+
+def load_all_point_clouds_under_folder(
+        top_dir, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False, normalize=False):
     file_names = [f for f in files_in_subdirs(top_dir, file_ending)]
-    pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(file_names, n_threads, loader=pc_loader, verbose=verbose)
-    return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False)
+    if file_ending == '.ply':
+        pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
+                file_names, n_threads, loader=pc_loader, verbose=verbose)
+        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+    elif file_ending == '.npy':
+        pclouds, model_ids, syn_ids = load_point_clouds_from_numpy_filenames(
+                file_names, n_threads, loader=pc_npy_loader, verbose=verbose, normalize=normalize)
+        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+
+
+def load_point_clouds_from_numpy_filenames(file_names, n_threads, loader, verbose=False, normalize=False):
+    pc = loader(file_names[0])[0]
+    pclouds = np.empty([len(file_names), pc.shape[0], pc.shape[1]], dtype=np.float32)
+    model_names = np.empty([len(file_names)], dtype=object)
+    class_ids = np.empty([len(file_names)], dtype=object)
+    pool = Pool(n_threads)
+
+    for i, data in enumerate(pool.imap(loader, file_names)):
+        pclouds[i, :, :], model_names[i], class_ids[i] = data
+
+    pool.close()
+    pool.join()
+
+    if normalize:
+        B, N = pclouds.shape[0], pclouds.shape[1]
+        pclouds_mean = pclouds.mean(axis=1).reshape(-1, 1, 3)
+        pclouds_std = pclouds.reshape(B, N*3).std(axis=1).reshape(-1, 1, 1)
+        pclouds = (pclouds  - pclouds_mean) / pclouds_std
+
+    if len(np.unique(model_names)) != len(pclouds):
+        warnings.warn('Point clouds with the same model name were loaded.')
+
+    if verbose:
+        print('{0} pclouds were loaded. They belong in {1} shape-classes.'.format(len(pclouds), len(np.unique(class_ids))))
+
+    return pclouds, model_names, class_ids
+
 
 
 def load_point_clouds_from_filenames(file_names, n_threads, loader, verbose=False):
@@ -143,7 +190,7 @@ class PointCloudDataSet(object):
     See https://github.com/tensorflow/tensorflow/blob/a5d8217c4ed90041bea2616c14a8ddcf11ec8c03/tensorflow/examples/tutorials/mnist/input_data.py
     '''
 
-    def __init__(self, point_clouds, noise=None, labels=None, copy=True, init_shuffle=True):
+    def __init__(self, point_clouds, noise=None, labels=None, copy=True, init_shuffle=True, max_num_points=None):
         '''Construct a DataSet.
         Args:
             init_shuffle, shuffle data before first epoch has been reached.
@@ -151,11 +198,14 @@ class PointCloudDataSet(object):
             original_pclouds, labels, (None or Feed) # TODO Rename
         '''
 
+        if max_num_points is not None:
+            point_clouds = point_clouds[:,:max_num_points,:]
         self.num_examples = point_clouds.shape[0]
         self.n_points = point_clouds.shape[1]
 
         if labels is not None:
-            assert point_clouds.shape[0] == labels.shape[0], ('points.shape: %s labels.shape: %s' % (point_clouds.shape, labels.shape))
+            assert point_clouds.shape[0] == labels.shape[0], \
+                    ('points.shape: %s labels.shape: %s' % (point_clouds.shape, labels.shape))
             if copy:
                 self.labels = labels.copy()
             else:
@@ -243,3 +293,5 @@ class PointCloudDataSet(object):
         self.num_examples = self.point_clouds.shape[0]
 
         return self
+
+

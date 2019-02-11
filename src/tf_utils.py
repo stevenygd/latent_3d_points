@@ -12,7 +12,8 @@ def expand_scope_by_name(scope, name):
     """ expand tf scope by given name.
     """
 
-    if isinstance(scope, basestring):
+    # if isinstance(scope, basestring):
+    if isinstance(scope, str):
         scope += '/' + name
         return scope
 
@@ -37,8 +38,8 @@ def reset_tf_graph():
     if 'sess' in globals() and sess:
         sess.close()
     tf.reset_default_graph()
-    
-    
+
+
 def leaky_relu(alpha):
     if not (alpha < 1 and alpha > 0):
         raise ValueError()

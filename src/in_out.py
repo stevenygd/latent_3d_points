@@ -134,6 +134,20 @@ def load_all_point_clouds_under_folder(
         return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
 
 
+def load_all_point_clouds_under_folders(
+        top_dirs, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False, normalize=False):
+    file_names = [f for top_dir in top_dirs for f in files_in_subdirs(top_dir, file_ending)]
+    if file_ending == '.ply':
+        pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
+                file_names, n_threads, loader=pc_loader, verbose=verbose)
+        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+    elif file_ending == '.npy':
+        pclouds, model_ids, syn_ids = load_point_clouds_from_numpy_filenames(
+                file_names, n_threads, loader=pc_npy_loader, verbose=verbose, normalize=normalize)
+        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+
+
+
 def load_point_clouds_from_numpy_filenames(file_names, n_threads, loader, verbose=False, normalize=False):
     pc = loader(file_names[0])[0]
     pclouds = np.empty([len(file_names), pc.shape[0], pc.shape[1]], dtype=np.float32)

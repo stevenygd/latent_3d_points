@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, "/home/gy46/")
 
 import numpy as np
+import os
 import os.path as osp
 from latent_3d_points.src.ae_templates import mlp_architecture_ala_iclr_18, default_train_params
 from latent_3d_points.src.autoencoder import Configuration as Conf
@@ -31,6 +32,8 @@ parser.add_argument('--ae_loss', type=str, default='chamfer', choices=['chamfer'
                     help='Loss to optimize for ([emd] or [chamfer]).')
 parser.add_argument('--load_pre_trained_ae', action='store_true',
                     help="Load pretrained AE or not.")
+parser.add_argument('--normalize_shape', action='store_true',
+                    help="Whether normalizing shape.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
 
@@ -62,7 +65,7 @@ print(class_dir)
 # Load Data
 print("Load data (train set)")
 all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=False)
+    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
 
 
 # Load default training parameters (some of which are listed beloq). For more details please print the configuration object.
@@ -133,7 +136,7 @@ class_dir = osp.join(top_in_dir , syn_id, 'val')
 print(syn_id)
 print(class_dir)
 all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=False)
+    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
 
 
 feed_pc, _, _ = all_pc_data.full_epoch_data()
@@ -155,6 +158,13 @@ all_sample = np.concatenate(all_sample)
 all_ref = np.concatenate(all_ref)
 print(all_sample.shape, all_ref.shape)
 
+sample_save_path = os.path.join(conf.train_dir, 'all_sample.npy')
+np.save(sample_save_path, all_sample)
+print("Samples save path:%s"%sample_save_path)
+
+reference_save_path = os.path.join(conf.train_dir, 'all_reference.npy')
+np.save(reference_save_path, all_ref)
+print("Reference save path:%s"%reference_save_path)
 
 from latent_3d_points.src.evaluation_metrics_fast import MMD_COV_EMD_CD
 mmd_emd, mmd_cd, cov_emd, cov_cd = MMD_COV_EMD_CD(all_sample, all_ref, 100, verbose=True)

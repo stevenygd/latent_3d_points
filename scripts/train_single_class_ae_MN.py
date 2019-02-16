@@ -27,6 +27,8 @@ parser.add_argument('--ae_loss', type=str, default='chamfer', choices=['chamfer'
                     help='Loss to optimize for ([emd] or [chamfer]).')
 parser.add_argument('--load_pre_trained_ae', action='store_true',
                     help="Load pretrained AE or not.")
+parser.add_argument('--normalize_shape', action='store_true',
+                    help="Whether normalizing shape.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
 
@@ -53,7 +55,7 @@ print("Load data (train set)")
 class_dirs = [ os.path.join(top_in_dir, f, 'train') for f in \
                os.listdir(top_in_dir) if os.path.isdir(os.path.join(top_in_dir, f, 'train'))]
 all_pc_data = load_all_point_clouds_under_folders(
-    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=True)
+    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
 
 
 # Load default training parameters (some of which are listed beloq). For more details please print the configuration object.
@@ -123,7 +125,7 @@ class_dirs = [os.path.join(top_in_dir, f, 'test') for f in \
         os.listdir(top_in_dir) if os.path.isdir(os.path.join(top_in_dir, f, 'test'))
 ]
 all_pc_data = load_all_point_clouds_under_folders(
-    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=True)
+    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=normalize_shape)
 
 
 feed_pc, _, _ = all_pc_data.full_epoch_data()

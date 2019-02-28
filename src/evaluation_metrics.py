@@ -31,6 +31,24 @@ except:
     print('External Losses (Chamfer-EMD) cannot be loaded. Please install them first.')
 
 
+def MMD_COV_EMD_CD(sample_pcs, ref_pcs, batch_size,
+        normalize=True, sess=None, verbose=False, use_sqrt=False, ret_dist=False):
+
+    mmd_cd, _ = minimum_mathing_distance(
+            sample_pcs, ref_pcs, batch_size, normalize, sess,
+            verbose, use_sqrt, use_EMD=False)
+    mmd_emd, _ = minimum_mathing_distance(
+            sample_pcs, ref_pcs, batch_size, normalize, sess,
+            verbose, use_sqrt, use_EMD=True)
+
+    cov_cd = coverage(sample_pcs, ref_pcs, batch_size, normalize, sess,
+             verbose, use_sqrt, use_EMD=False, ret_dist=False)[0]
+    cov_emd = coverage(sample_pcs, ref_pcs, batch_size, normalize, sess,
+             verbose, use_sqrt, use_EMD=True, ret_dist=False)[0]
+
+    return mmd_emd, mmd_cd, cov_emd, cov_cd
+
+
 def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=True, sess=None, verbose=False, use_sqrt=False, use_EMD=False):
     ''' Produces the graph operations necessary to compute the MMD and consequently also the Coverage due to their 'symmetric' nature.
     Assuming a "reference" and a "sample" set of point-clouds that will be matched, this function creates the operation that matches

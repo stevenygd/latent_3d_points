@@ -69,6 +69,7 @@ def unpickle_data(file_name):
 
 
 def files_in_subdirs(top_dir, search_pattern):
+    import pdb; pdb.set_trace()
     regex = re.compile(search_pattern)
     for path, _, files in os.walk(top_dir):
         for name in files:

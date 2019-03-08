@@ -3,13 +3,14 @@ import os
 import torch
 
 import sys
-sys.path.insert(0, '/home/gy46/MVP')
+sys.path.insert(0, '/home/guandao/Projects/MVP')
 import numpy as np
 import random
 
 # For evaluation
 from pprint import pprint
 from metrics.evaluation_metrics_pytorch import MMD_COV_EMD_CD
+from metrics.evaluation_metrics_pytorch import jsd_between_point_cloud_sets as JSD
 
 if __name__ == '__main__':
 
@@ -33,6 +34,11 @@ if __name__ == '__main__':
     ref_pcl = torch.from_numpy(np.load(args.ref_filename)).cuda()
     print("Reference size:" + str(ref_pcl.shape))
 
+    print("compute JSD")
+    jsd = JSD(sample_pcl.cpu().detach().numpy(), ref_pcl.cpu().detach().numpy())
+    print("JSD:%s"%jsd)
+
+    print("compute MMD-COV")
     results = MMD_COV_EMD_CD(sample_pcl, ref_pcl, args.batch_size,
             one_to_one=args.one_to_one, accelerated_cd=True, verbose=True)
     pprint(results)

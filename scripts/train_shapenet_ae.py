@@ -71,7 +71,8 @@ for subdir in os.listdir(os.path.join(top_in_dir)):
     sub_dirs.append(p)
 
 all_pc_data = load_all_point_clouds_under_folders(
-    sub_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+    sub_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True,
+    normalize=args.normalize_shape, rotation_axis=(1 if args.random_rotation else None))
 
 
 # Load default training parameters (some of which are listed beloq). For more details please print the configuration object.

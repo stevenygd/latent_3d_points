@@ -41,17 +41,10 @@ args = parser.parse_args()
 print(args)
 
 
-# top_out_dir = '../expr/'                      # Use to save Neural-Net check-points etc.
-# top_in_dir = '../data/ShapeNetCore.v2.PC15k/' # Top-dir of where point-clouds are stored.
 top_out_dir = args.output_dir
 top_in_dir = args.dataset_dir
-
-
-# experiment_name = 'single_class_ae_emd'
 n_pc_points = 2048                # Number of points per model.
 bneck_size = 128                  # Bottleneck-AE size
-
-
 ae_loss = args.ae_loss
 class_name = "all"
 experiment_name = '%s_%s_ae_%s'%(args.expr_prefix, ae_loss, class_name)

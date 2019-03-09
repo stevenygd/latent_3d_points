@@ -29,6 +29,8 @@ parser.add_argument('--load_pre_trained_ae', action='store_true',
                     help="Load pretrained AE or not.")
 parser.add_argument('--normalize_shape', action='store_true',
                     help="Whether normalizing shape.")
+parser.add_argument('--random_rotation', action='store_true',
+                    help="Whether apply random rotation.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
 
@@ -40,7 +42,6 @@ print(args)
 top_out_dir = args.output_dir
 top_in_dir = args.dataset_dir
 
-# experiment_name = 'single_class_ae_emd'
 n_pc_points = 2048                # Number of points per model.
 bneck_size = 128                  # Bottleneck-AE size
 
@@ -55,7 +56,9 @@ print("Load data (train set)")
 class_dirs = [ os.path.join(top_in_dir, f, 'train') for f in \
                os.listdir(top_in_dir) if os.path.isdir(os.path.join(top_in_dir, f, 'train'))]
 all_pc_data = load_all_point_clouds_under_folders(
-    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+    class_dirs, n_threads=8, file_ending='.npy', max_num_points=n_pc_points, verbose=True,
+    normalize=args.normalize_shape, rotation_axis=(1 if args.random_rotation else None)
+)
 
 
 # Load default training parameters (some of which are listed beloq). For more details please print the configuration object.
@@ -125,7 +128,7 @@ class_dirs = [os.path.join(top_in_dir, f, 'test') for f in \
         os.listdir(top_in_dir) if os.path.isdir(os.path.join(top_in_dir, f, 'test'))
 ]
 all_pc_data = load_all_point_clouds_under_folders(
-    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=normalize_shape)
+    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
 
 
 feed_pc, _, _ = all_pc_data.full_epoch_data()

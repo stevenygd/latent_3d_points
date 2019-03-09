@@ -4,7 +4,7 @@
 #     (it assumes latent_3d_points is in the PYTHONPATH and the structural losses have been compiled)
 
 import sys
-sys.path.insert(0, "/home/guandao/hdd/Projects/")
+sys.path.insert(0, "/home/gy46/")
 
 import numpy as np
 import os
@@ -14,7 +14,7 @@ from latent_3d_points.src.autoencoder import Configuration as Conf
 from latent_3d_points.src.point_net_ae import PointNetAutoEncoder
 
 from latent_3d_points.src.in_out import snc_category_to_synth_id, create_dir, snc_synth_id_to_category
-from latent_3d_points.src.in_out import PointCloudDataSet,load_all_point_clouds_under_folder
+from latent_3d_points.src.in_out import PointCloudDataSet,load_all_point_clouds_under_folder, load_all_point_clouds_under_folders
 
 from latent_3d_points.src.tf_utils import reset_tf_graph
 from latent_3d_points.src.general_utils import plot_3d_point_cloud
@@ -30,6 +30,8 @@ parser.add_argument('--ae_loss', type=str, default='chamfer', choices=['chamfer'
                     help='Loss to optimize for ([emd] or [chamfer]).')
 parser.add_argument('--load_pre_trained_ae', action='store_true',
                     help="Load pretrained AE or not.")
+parser.add_argument('--random_rotation', action='store_true',
+                    help="Whether apply random rotation.")
 parser.add_argument('--normalize_shape', action='store_true',
                     help="Whether normalizing shape.")
 parser.add_argument('--epochs', type=int, default=1000,
@@ -62,8 +64,14 @@ print(class_dir)
 
 # Load Data
 print("Load data (train set)")
-all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='train/*.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+sub_dirs = []
+for subdir in os.listdir(os.path.join(top_in_dir)):
+    p = os.path.join(top_in_dir, subdir, 'train')
+    print(p)
+    sub_dirs.append(p)
+
+all_pc_data = load_all_point_clouds_under_folders(
+    sub_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
 
 
 # Load default training parameters (some of which are listed beloq). For more details please print the configuration object.

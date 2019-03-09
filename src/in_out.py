@@ -69,7 +69,6 @@ def unpickle_data(file_name):
 
 
 def files_in_subdirs(top_dir, search_pattern):
-    import pdb; pdb.set_trace()
     regex = re.compile(search_pattern)
     for path, _, files in os.walk(top_dir):
         for name in files:
@@ -123,29 +122,41 @@ def pc_npy_loader(f_name):
 
 
 def load_all_point_clouds_under_folder(
-        top_dir, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False, normalize=False):
+        top_dir, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False,
+        normalize=False, rotation_axis=None):
     file_names = [f for f in files_in_subdirs(top_dir, file_ending)]
     if file_ending == '.ply':
         pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
                 file_names, n_threads, loader=pc_loader, verbose=verbose)
-        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+        return PointCloudDataSet(
+                pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points,
+                rotation_axis=rotation_axis)
     elif file_ending == '.npy':
         pclouds, model_ids, syn_ids = load_point_clouds_from_numpy_filenames(
                 file_names, n_threads, loader=pc_npy_loader, verbose=verbose, normalize=normalize)
-        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+        return PointCloudDataSet(
+                pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points,
+                rotation_axis=rotation_axis)
 
 
 def load_all_point_clouds_under_folders(
-        top_dirs, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False, normalize=False):
+        top_dirs, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False,
+        normalize=False, rotation_axis=None):
     file_names = [f for top_dir in top_dirs for f in files_in_subdirs(top_dir, file_ending)]
     if file_ending == '.ply':
         pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
                 file_names, n_threads, loader=pc_loader, verbose=verbose)
-        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+        return PointCloudDataSet(
+                pclouds, labels=syn_ids + '_' + model_ids,
+                init_shuffle=False, max_num_points=max_num_points,
+                rotation_axis=rotation_axis)
     elif file_ending == '.npy':
         pclouds, model_ids, syn_ids = load_point_clouds_from_numpy_filenames(
                 file_names, n_threads, loader=pc_npy_loader, verbose=verbose, normalize=normalize)
-        return PointCloudDataSet(pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points)
+        return PointCloudDataSet(
+                pclouds, labels=syn_ids + '_' + model_ids,
+                init_shuffle=False, max_num_points=max_num_points,
+                rotation_axis=rotation_axis)
 
 
 
@@ -205,7 +216,8 @@ class PointCloudDataSet(object):
     See https://github.com/tensorflow/tensorflow/blob/a5d8217c4ed90041bea2616c14a8ddcf11ec8c03/tensorflow/examples/tutorials/mnist/input_data.py
     '''
 
-    def __init__(self, point_clouds, noise=None, labels=None, copy=True, init_shuffle=True, max_num_points=None):
+    def __init__(self, point_clouds, noise=None, labels=None, copy=True, init_shuffle=True, max_num_points=None,
+                 rotation_axis=None):
         '''Construct a DataSet.
         Args:
             init_shuffle, shuffle data before first epoch has been reached.
@@ -217,6 +229,7 @@ class PointCloudDataSet(object):
             point_clouds = point_clouds[:,:max_num_points,:]
         self.num_examples = point_clouds.shape[0]
         self.n_points = point_clouds.shape[1]
+        self.rotation_axis = rotation_axis
 
         if labels is not None:
             assert point_clouds.shape[0] == labels.shape[0], \
@@ -248,6 +261,60 @@ class PointCloudDataSet(object):
         if init_shuffle:
             self.shuffle_data()
 
+
+    def apply_random_rotation(self, pc, rot=None, theta=None):
+        # import pdb; pdb.set_trace()
+
+        B = pc.shape[0]
+        if rot is not None and theta is not None:
+            assert rot.shape[0] == B
+            assert rot.shape[1] == 3
+            assert rot.shape[2] == 3
+            rot = rot
+            theta = theta
+
+        elif self.rotation_axis is None:
+            zeros = np.zeros(B)
+            ones  = np.ones(B)
+            rot = np.stack([
+                ones,   zeros,  zeros,
+                zeros,  ones,   zeros,
+                zeros,  zeros,  ones
+            ]).T.reshape(B, 3, 3)
+            theta = np.zeros(B)
+
+        else:
+            theta = np.random.rand(B) * 2 * np.pi
+            zeros = np.zeros(B)
+            ones  = np.ones(B)
+            cos   = np.cos(theta)
+            sin   = np.sin(theta)
+            if self.rotation_axis == 0:
+                rot = np.stack([
+                    cos,   -sin,  zeros,
+                    sin,   cos,   zeros,
+                    zeros, zeros, ones
+                ]).T.reshape(B, 3, 3)
+            elif self.rotation_axis == 1:
+                rot = np.stack([
+                    cos,   zeros, -sin,
+                    zeros, ones,  zeros,
+                    sin,   zeros, cos
+                ]).T.reshape(B, 3, 3)
+            elif self.rotation_axis == 2:
+                rot = np.stack([
+                    ones,  zeros, zeros,
+                    zeros, cos,   -sin,
+                    zeros, sin,   cos
+                ]).T.reshape(B, 3, 3)
+            else:
+                raise Exception("Invalid rotation axis")
+
+        # (B, N, 3) mul (B, 3, 3) -> (B, N, 3)
+        pc_rotated = np.matmul(pc, rot)
+        return pc_rotated, rot, theta
+
+
     def shuffle_data(self, seed=None):
         if seed is not None:
             np.random.seed(seed)
@@ -258,6 +325,7 @@ class PointCloudDataSet(object):
         if self.noisy_point_clouds is not None:
             self.noisy_point_clouds = self.noisy_point_clouds[perm]
         return self
+
 
     def next_batch(self, batch_size, seed=None):
         '''Return the next batch_size examples from this data set.
@@ -272,10 +340,19 @@ class PointCloudDataSet(object):
             self._index_in_epoch = batch_size
         end = self._index_in_epoch
 
+        pcl = self.point_clouds[start:end]
+        pcl, rot, theta = self.apply_random_rotation(pcl, rot=None, theta=None)
+        lbl = self.labels[start:end]
+
         if self.noisy_point_clouds is None:
-            return self.point_clouds[start:end], self.labels[start:end], None
+            # return self.point_clouds[start:end], self.labels[start:end], None
+            return pcl, lbl, None
         else:
-            return self.point_clouds[start:end], self.labels[start:end], self.noisy_point_clouds[start:end]
+            noisy_pcl = self.noisy_point_clouds[start:end]
+            noisy_pcl = self.apply_random_rotation(noisy_pcl, rot=rot, theta=theta)
+            # return self.point_clouds[start:end], self.labels[start:end], self.noisy_point_clouds[start:end]
+            return pcl, lbl, noisy_pcl
+
 
     def full_epoch_data(self, shuffle=True, seed=None):
         '''Returns a copy of the examples of the entire data set (i.e. an epoch's data), shuffled.
@@ -286,11 +363,14 @@ class PointCloudDataSet(object):
         if shuffle:
             np.random.shuffle(perm)
         pc = self.point_clouds[perm]
+        pc, rot, theta = self.apply_random_rotation(pc, rot=None, theta=None)
         lb = self.labels[perm]
         ns = None
         if self.noisy_point_clouds is not None:
             ns = self.noisy_point_clouds[perm]
+            ns = self.apply_random_rotation(ns, rot=rot, theta=theta)
         return pc, lb, ns
+
 
     def merge(self, other_data_set):
         self._index_in_epoch = 0

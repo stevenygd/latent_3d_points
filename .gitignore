@@ -7,3 +7,8 @@
 data/*
 external/structural_losses/*.o
 external/structural_losses/*.so
+scripts/*.npy
+expr
+expr/
+test_pcls/*
+test_pcls

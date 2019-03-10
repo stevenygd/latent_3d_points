@@ -46,6 +46,8 @@ n_pc_points = 2048                # Number of points per model.
 bneck_size = 128                  # Bottleneck-AE size
 
 ae_loss = args.ae_loss
+if args.dataset_dir.endswith(os.sep):
+    args.dataset_dir = args.dataset_dir[:-1]
 experiment_name = '%s_%s_ae_%s'%(args.expr_prefix, ae_loss, os.path.basename(args.dataset_dir))
 print("Experiment name:%s")
 print(experiment_name)
@@ -122,39 +124,39 @@ fout = open(osp.join(conf.train_dir, 'train_stats.txt'), 'a', buf_size)
 train_stats = ae.train(all_pc_data, conf, log_file=fout)
 fout.close()
 
-# Load Validation set
-print("Load validation set")
-class_dirs = [os.path.join(top_in_dir, f, 'test') for f in \
-        os.listdir(top_in_dir) if os.path.isdir(os.path.join(top_in_dir, f, 'test'))
-]
-all_pc_data = load_all_point_clouds_under_folders(
-    class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+# # Load Validation set
+# print("Load validation set")
+# class_dirs = [os.path.join(top_in_dir, f, 'test') for f in \
+#         os.listdir(top_in_dir) if os.path.isdir(os.path.join(top_in_dir, f, 'test'))
+# ]
+# all_pc_data = load_all_point_clouds_under_folders(
+#     class_dirs, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+#
+#
+# feed_pc, _, _ = all_pc_data.full_epoch_data()
+# feed_pc_tr_all = feed_pc[:, :n_pc_points]
+# feed_pc_te_all = feed_pc[:, -n_pc_points:]
+# print(feed_pc_tr_all.shape)
+# print(feed_pc_te_all.shape)
+#
+# print("Gather samples")
+# all_sample = []
+# all_ref = []
+# for i in range(feed_pc_tr_all.shape[0]):
+#     feed_pc_tr = feed_pc_tr_all[i:i+1]
+#     feed_pc_te = feed_pc_te_all[i:i+1]
+#     reconstructions = ae.reconstruct(feed_pc_tr)[0]
+#     all_sample.append(reconstructions)
+#     all_ref.append(feed_pc_te)
+# all_sample = np.concatenate(all_sample)
+# all_ref = np.concatenate(all_ref)
+# print(all_sample.shape, all_ref.shape)
 
 
-feed_pc, _, _ = all_pc_data.full_epoch_data()
-feed_pc_tr_all = feed_pc[:, :n_pc_points]
-feed_pc_te_all = feed_pc[:, -n_pc_points:]
-print(feed_pc_tr_all.shape)
-print(feed_pc_te_all.shape)
-
-print("Gather samples")
-all_sample = []
-all_ref = []
-for i in range(feed_pc_tr_all.shape[0]):
-    feed_pc_tr = feed_pc_tr_all[i:i+1]
-    feed_pc_te = feed_pc_te_all[i:i+1]
-    reconstructions = ae.reconstruct(feed_pc_tr)[0]
-    all_sample.append(reconstructions)
-    all_ref.append(feed_pc_te)
-all_sample = np.concatenate(all_sample)
-all_ref = np.concatenate(all_ref)
-print(all_sample.shape, all_ref.shape)
-
-
-from latent_3d_points.src.evaluation_metrics_fast import MMD_COV_EMD_CD
-mmd_emd, mmd_cd, cov_emd, cov_cd = MMD_COV_EMD_CD(all_sample, all_ref, 100, verbose=True)
-print("Validation results for :%s"%experiment_name)
-print("MMD-EMD:%s"%mmd_emd)
-print("MMD-CD:%s"%mmd_cd)
+# from latent_3d_points.src.evaluation_metrics_fast import MMD_COV_EMD_CD
+# mmd_emd, mmd_cd, cov_emd, cov_cd = MMD_COV_EMD_CD(all_sample, all_ref, 100, verbose=True)
+# print("Validation results for :%s"%experiment_name)
+# print("MMD-EMD:%s"%mmd_emd)
+# print("MMD-CD:%s"%mmd_cd)
 
 

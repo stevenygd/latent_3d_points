@@ -36,7 +36,8 @@ parser.add_argument('--normalize_shape', action='store_true',
                     help="Whether normalizing shape.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
-
+parser.add_argument('--split_file', type=str, default=None,
+                    help="File that contains the split.")
 args = parser.parse_args()
 print(args)
 
@@ -55,7 +56,6 @@ experiment_name = '%s_%s_ae_%s'%(args.expr_prefix, ae_loss, class_name)
 print("Experiment name:%s")
 print(experiment_name)
 
-
 syn_id = snc_category_to_synth_id()[class_name]
 class_dir = osp.join(top_in_dir , syn_id, 'train')
 print(syn_id)
@@ -64,8 +64,15 @@ print(class_dir)
 
 # Load Data
 print("Load data (train set)")
+if args.split_file is not None:
+    file_names = np.load(args.split_file).item()[syn_id]['train']
+    file_names = [ os.path.join(args.dataset_dir, syn_id, f+".npy") for f in file_names ]
+else:
+    file_names = None
+
 all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048,
+    verbose=True, normalize=args.normalize_shape, file_names=file_names)
 
 
 # Load default training parameters (some of which are listed beloq). For more details please print the configuration object.

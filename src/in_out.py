@@ -123,8 +123,9 @@ def pc_npy_loader(f_name):
 
 def load_all_point_clouds_under_folder(
         top_dir, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False,
-        normalize=False, rotation_axis=None):
-    file_names = [f for f in files_in_subdirs(top_dir, file_ending)]
+        normalize=False, rotation_axis=None, file_names=None):
+    if file_names is None:
+        file_names = [f for f in files_in_subdirs(top_dir, file_ending)]
     if file_ending == '.ply':
         pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
                 file_names, n_threads, loader=pc_loader, verbose=verbose)
@@ -141,8 +142,9 @@ def load_all_point_clouds_under_folder(
 
 def load_all_point_clouds_under_folders(
         top_dirs, n_threads=20, file_ending='.ply', max_num_points=None, verbose=False,
-        normalize=False, rotation_axis=None):
-    file_names = [f for top_dir in top_dirs for f in files_in_subdirs(top_dir, file_ending)]
+        normalize=False, rotation_axis=None, file_names=None):
+    if file_names is None:
+        file_names = [f for top_dir in top_dirs for f in files_in_subdirs(top_dir, file_ending)]
     if file_ending == '.ply':
         pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
                 file_names, n_threads, loader=pc_loader, verbose=verbose)

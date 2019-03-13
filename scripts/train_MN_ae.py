@@ -33,6 +33,8 @@ parser.add_argument('--random_rotation', action='store_true',
                     help="Whether apply random rotation.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
+parser.add_argument('--bneck_size', type=int, default=129,
+                    help="Size of the bottleneck.")
 
 args = parser.parse_args()
 print(args)
@@ -42,8 +44,8 @@ print(args)
 top_out_dir = args.output_dir
 top_in_dir = args.dataset_dir
 
-n_pc_points = 2048                # Number of points per model.
-bneck_size = 128                  # Bottleneck-AE size
+n_pc_points = 2048              # Number of points per model.
+bneck_size = args.bneck_size    # Bottleneck-AE size
 
 ae_loss = args.ae_loss
 if args.dataset_dir.endswith(os.sep):

@@ -36,6 +36,10 @@ parser.add_argument('--normalize_shape', action='store_true',
                     help="Whether normalizing shape.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
+parser.add_argument('--restore_epochs', type=int, default=500,
+                    help="Restore epochs.")
+parser.add_argument('--bneck_size', type=int, default=128,
+                    help="Bottleneck size (default 128).")
 
 args = parser.parse_args()
 print(args)
@@ -44,7 +48,7 @@ print(args)
 top_out_dir = args.output_dir
 top_in_dir = args.dataset_dir
 n_pc_points = 2048                # Number of points per model.
-bneck_size = 128                  # Bottleneck-AE size
+bneck_size = args.bneck_size      # Bottleneck-AE size
 ae_loss = args.ae_loss
 class_name = "all"
 experiment_name = '%s_%s_ae_%s'%(args.expr_prefix, ae_loss, class_name)
@@ -110,18 +114,18 @@ conf.save(osp.join(train_dir, 'configuration'))
 print("Model configuration:")
 print(conf)
 
+print("Build tensorflow graph")
+reset_tf_graph()
+ae = PointNetAutoEncoder(conf.experiment_name, conf)
 
 load_pre_trained_ae = args.load_pre_trained_ae
-restore_epoch = args.epochs
+restore_epoch = args.restore_epochs
 if load_pre_trained_ae:
     conf = Conf.load(train_dir + '/configuration')
     reset_tf_graph()
     ae = PointNetAutoEncoder(conf.experiment_name, conf)
     ae.restore_model(conf.train_dir, epoch=restore_epoch)
 
-print("Build tensorflow graph")
-reset_tf_graph()
-ae = PointNetAutoEncoder(conf.experiment_name, conf)
 
 print("Start training...")
 buf_size = 1 # Make 'training_stats' file to flush each output line regarding training.

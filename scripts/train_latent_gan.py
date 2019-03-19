@@ -34,6 +34,7 @@ parser.add_argument('--expr_prefix', type=str, default='shapenetcorev2', help='P
 parser.add_argument('--normalize_shape', action='store_true', help="Whether normalizing shape.")
 parser.add_argument('--ae_epochs', type=int, default=1000, help="AE epochs to resume.")
 parser.add_argument('--epochs', type=int, default=1000, help="Training epochs.")
+parser.add_argument('--split_file', type=str, default=None, help="File that contains the split.")
 args = parser.parse_args()
 print(args)
 
@@ -64,8 +65,15 @@ syn_id = snc_category_to_synth_id()[class_name]
 class_dir = osp.join(top_in_dir , syn_id, 'train')
 print(syn_id)
 print(class_dir)
+
+if args.split_file is not None:
+    file_names = np.load(args.split_file).item()[syn_id]['train']
+    file_names = [ os.path.join(args.dataset_dir, syn_id, f+".npy") for f in file_names ]
+else:
+    file_names = None
 all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True,
+    normalize=args.normalize_shape, file_names=file_names)
 print 'Shape of DATA =', all_pc_data.point_clouds.shape
 
 
@@ -138,7 +146,6 @@ else:
 accum_syn_data = []
 train_stats = []
 
-
 ##################
 # Train the GAN. #
 ##################
@@ -185,8 +192,14 @@ for _ in range(n_epochs):
 print("Load data (val set for evaluation)")
 syn_id = snc_category_to_synth_id()[class_name]
 class_dir = osp.join(top_in_dir , syn_id, 'val')
+if args.split_file is not None:
+    file_names = np.load(args.split_file).item()[syn_id]['val']
+    file_names = [ os.path.join(args.dataset_dir, syn_id, f+".npy") for f in file_names ]
+else:
+    file_names = None
 all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True,
+    normalize=args.normalize_shape, file_names=file_names)
 print 'Shape of DATA =', all_pc_data.point_clouds.shape
 
 print("Split into train and test points")

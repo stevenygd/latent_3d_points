@@ -30,13 +30,15 @@ parser.add_argument('--normalize_shape', action='store_true',
                     help="Whether normalizing shape.")
 parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
+parser.add_argument('--bneck_size', type=int, default=128,
+                    help="Bottleneck size.")
 args = parser.parse_args()
 print(args)
 
 train_dir = args.train_dir
 top_in_dir = args.dataset_dir
 n_pc_points = 2048                # Number of points per model.
-bneck_size = 128                  # Bottleneck-AE size
+bneck_size = args.bneck_size # Bottleneck-AE size
 restore_epoch = args.epochs
 
 print("Build model")
@@ -48,7 +50,7 @@ print(conf)
 reset_tf_graph()
 print("Build tensorflow graph")
 ae = PointNetAutoEncoder(conf.experiment_name, conf)
-ae.restore_model(conf.train_dir, epoch=restore_epoch)
+ae.restore_model(args.train_dir, epoch=restore_epoch)
 
 #####################
 # Load Training Set

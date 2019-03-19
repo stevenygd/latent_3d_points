@@ -130,6 +130,8 @@ print("Build tensorflow graph")
 reset_tf_graph()
 ae = PointNetAutoEncoder(conf.experiment_name, conf)
 
+import pdb; pdb.set_trace()
+
 print("Start training...")
 buf_size = 1 # Make 'training_stats' file to flush each output line regarding training.
 fout = open(osp.join(conf.train_dir, 'train_stats.txt'), 'a', buf_size)
@@ -137,13 +139,18 @@ train_stats = ae.train(all_pc_data, conf, log_file=fout)
 fout.close()
 
 # Load Validation set
-print("Load validation set")
+print("Load data (val set for evaluation)")
 syn_id = snc_category_to_synth_id()[class_name]
 class_dir = osp.join(top_in_dir , syn_id, 'val')
-print(syn_id)
-print(class_dir)
+if args.split_file is not None:
+    file_names = np.load(args.split_file).item()[syn_id]['val']
+    file_names = [ os.path.join(args.dataset_dir, syn_id, f+".npy") for f in file_names ]
+else:
+    file_names = None
 all_pc_data = load_all_point_clouds_under_folder(
-    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True, normalize=args.normalize_shape)
+    class_dir, n_threads=8, file_ending='.npy', max_num_points=2048, verbose=True,
+    normalize=args.normalize_shape, file_names=file_names)
+print 'Shape of DATA =', all_pc_data.point_clouds.shape
 
 
 feed_pc, _, _ = all_pc_data.full_epoch_data()

@@ -10,7 +10,7 @@ sys.path.insert(0, "/home/gy46/")
 import numpy as np
 import os
 import os.path as osp
-from latent_3d_points.src.ae_templates import mlp_architecture_ala_iclr_18, default_train_params
+from latent_3d_points.src.ae_templates import default_train_params, mlp_architecture_SVMexpr
 from latent_3d_points.src.autoencoder import Configuration as Conf
 from latent_3d_points.src.point_net_ae import PointNetAutoEncoder
 
@@ -25,7 +25,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--dataset_dir', type=str, default="../data/ShapeNetCore.v2.PC15k/", help='Dataset path.')
 parser.add_argument('--output_dir', type=str, default="../expr/", help='Output path.')
-parser.add_argument('--expr_prefix', type=str, default='shapenetcorev2',
+parser.add_argument('--expr_prefix', type=str, default='MNpretrain_shapenetcorev2_largerModel',
                     help='Prefix for the experiment.')
 parser.add_argument('--ae_loss', type=str, default='chamfer', choices=['chamfer', 'emd'],
                     help='Loss to optimize for ([emd] or [chamfer]).')
@@ -39,7 +39,7 @@ parser.add_argument('--epochs', type=int, default=1000,
                     help="Training epochs.")
 parser.add_argument('--restore_epochs', type=int, default=500,
                     help="Restore epochs.")
-parser.add_argument('--bneck_size', type=int, default=128,
+parser.add_argument('--bneck_size', type=int, default=512,
                     help="Bottleneck size (default 128).")
 
 args = parser.parse_args()
@@ -89,7 +89,7 @@ all_pc_data = load_all_point_clouds_under_folders(
 print("Build model")
 train_params = default_train_params()
 train_params['training_epochs'] = args.epochs
-encoder, decoder, enc_args, dec_args = mlp_architecture_ala_iclr_18(n_pc_points, bneck_size)
+encoder, decoder, enc_args, dec_args = mlp_architecture_SVMexpr(n_pc_points, bneck_size)
 train_dir = create_dir(osp.join(top_out_dir, experiment_name))
 
 conf = Conf(n_input = [n_pc_points, 3],

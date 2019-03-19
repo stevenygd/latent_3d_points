@@ -129,6 +129,7 @@ def load_all_point_clouds_under_folder(
     if file_ending == '.ply':
         pclouds, model_ids, syn_ids = load_point_clouds_from_filenames(
                 file_names, n_threads, loader=pc_loader, verbose=verbose)
+        import pdb; pdb.set_trace()
         return PointCloudDataSet(
                 pclouds, labels=syn_ids + '_' + model_ids, init_shuffle=False, max_num_points=max_num_points,
                 rotation_axis=rotation_axis)
@@ -285,6 +286,7 @@ class PointCloudDataSet(object):
             ]).T.reshape(B, 3, 3)
             theta = np.zeros(B)
 
+            return pc, rot, theta
         else:
             theta = np.random.rand(B) * 2 * np.pi
             zeros = np.zeros(B)
@@ -312,9 +314,9 @@ class PointCloudDataSet(object):
             else:
                 raise Exception("Invalid rotation axis")
 
-        # (B, N, 3) mul (B, 3, 3) -> (B, N, 3)
-        pc_rotated = np.matmul(pc, rot)
-        return pc_rotated, rot, theta
+            # (B, N, 3) mul (B, 3, 3) -> (B, N, 3)
+            pc_rotated = np.matmul(pc, rot)
+            return pc_rotated, rot, theta
 
 
     def shuffle_data(self, seed=None):

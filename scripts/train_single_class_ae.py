@@ -4,7 +4,7 @@
 #     (it assumes latent_3d_points is in the PYTHONPATH and the structural losses have been compiled)
 
 import sys
-sys.path.insert(0, "/home/gy46/")
+sys.path.insert(0, '/hdd/Projects')
 
 import numpy as np
 import os

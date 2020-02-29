@@ -1,7 +1,7 @@
 # coding: utf-8
 import os
 import sys
-sys.path.insert(0, '/home/gy46/')
+sys.path.insert(0, '/hdd/Projects/')
 import numpy as np
 import os.path as osp
 import matplotlib.pylab as plt
@@ -120,7 +120,6 @@ else:
 accum_syn_data = []
 train_stats = []
 
-import pdb; pdb.set_trace()
 
 ##################
 # Train the GAN. #
